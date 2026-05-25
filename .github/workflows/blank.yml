@@ -1,4 +1,4 @@
-name: Steam Depot Downloader (Stable Windows)
+name: Steam Depot Downloader (Clean Windows)
 
 on:
   workflow_dispatch:
@@ -11,12 +11,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Setup folders
+      - name: Create folders
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force steamcmd
           New-Item -ItemType Directory -Force output
-          New-Item -ItemType Directory -Force $env:GITHUB_WORKSPACE\steam_config
 
       - name: Download SteamCMD
         shell: powershell
@@ -27,50 +26,40 @@ jobs:
 
           Expand-Archive steamcmd.zip -DestinationPath steamcmd -Force
 
-      - name: Force SteamCMD config bootstrap (IMPORTANT FIX)
-        shell: powershell
-        run: |
-          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\steamcmd\config"
-
-      - name: Run SteamCMD (NO HANG FIXED)
+      - name: Run SteamCMD (MINIMAL - FIXED)
         shell: powershell
         run: |
           $steamcmd = "$env:GITHUB_WORKSPACE\steamcmd\steamcmd.exe"
 
-          $env:HOME = $env:GITHUB_WORKSPACE
-          $env:STEAMCMDDIR = "$env:GITHUB_WORKSPACE\steamcmd"
-
-          & $steamcmd -console `
-            +@ShutdownOnFailedCommand 1 `
-            +@NoPromptForPassword 1 `
-            +login anonymous `
-            +force_install_dir "$env:GITHUB_WORKSPACE\output" `
-            +app_update 740 validate `
-            +quit
-
-          & $steamcmd -console `
-            +@ShutdownOnFailedCommand 1 `
-            +@NoPromptForPassword 1 `
+          & $steamcmd `
             +login anonymous `
             +download_depot 730 731 7043469183016184477 `
             +download_depot 730 732 4047004309608881181 `
             +quit
 
-      - name: Verify output
+      - name: Locate downloaded files
         shell: powershell
         run: |
-          Write-Host "=== OUTPUT FILES ==="
-          Get-ChildItem -Recurse "$env:GITHUB_WORKSPACE\output"
+          Get-ChildItem -Recurse "$env:USERPROFILE\Steam\steamapps\content" -ErrorAction SilentlyContinue
+          Get-ChildItem -Recurse "$env:PROGRAMFILES(x86)\Steam\steamapps\content" -ErrorAction SilentlyContinue
+
+      - name: Copy output
+        shell: powershell
+        run: |
+          $src1 = "$env:USERPROFILE\Steam\steamapps\content\730"
+          $src2 = "$env:PROGRAMFILES(x86)\Steam\steamapps\content\730"
+
+          if (Test-Path $src1) { Copy-Item $src1\* output -Recurse -Force }
+          if (Test-Path $src2) { Copy-Item $src2\* output -Recurse -Force }
 
       - name: Install 7zip
         shell: powershell
-        run: |
-          choco install 7zip -y
+        run: choco install 7zip -y
 
       - name: Create archive
         shell: powershell
         run: |
-          & "C:\Program Files\7-Zip\7z.exe" a depot_build.7z "$env:GITHUB_WORKSPACE\output\*"
+          & "C:\Program Files\7-Zip\7z.exe" a depot_build.7z output\*
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
