@@ -10,30 +10,40 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y steamcmd p7zip-full
+          sudo apt-get install -y curl tar p7zip-full lib32gcc-s1 lib32stdc++6
 
-      - name: Download depots with SteamCMD
+      - name: Install SteamCMD manually (FIXED)
+        run: |
+          mkdir -p steamcmd
+          cd steamcmd
+
+          curl -O https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+          tar -xvzf steamcmd_linux.tar.gz
+
+      - name: Run SteamCMD downloads
         run: |
           mkdir -p output
 
-          steamcmd +login anonymous \
+          ./steamcmd/steamcmd.sh +login anonymous \
             +download_depot 730 731 7043469183016184477 \
             +download_depot 730 732 4047004309608881181 \
             +quit
 
-      - name: Collect downloaded files
+      - name: Collect depot files
         run: |
           mkdir -p output
 
-          # SteamCMD depot output location
-          cp -r ~/.steam/steam/steamapps/content/730/* output/ || true
+          # SteamCMD default output path
+          if [ -d "$HOME/Steam/steamapps/content/730" ]; then
+            cp -r "$HOME/Steam/steamapps/content/730/"* output/
+          fi
 
-          # fallback path (some runners use this instead)
-          cp -r ~/.local/share/Steam/steamapps/content/730/* output/ || true
+          if [ -d "$HOME/.steam/steam/steamapps/content/730" ]; then
+            cp -r "$HOME/.steam/steam/steamapps/content/730/"* output/
+          fi
 
-      - name: Create 7z archive
+      - name: Create .7z archive
         run: |
           7z a depot_build.7z output
 
