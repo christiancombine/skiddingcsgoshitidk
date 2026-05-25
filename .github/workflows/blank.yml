@@ -1,4 +1,4 @@
-name: Steam Depot Downloader (Windows Stable)
+name: Steam Depot Downloader (FIXED)
 
 on:
   workflow_dispatch:
@@ -26,50 +26,35 @@ jobs:
 
           Expand-Archive steamcmd.zip -DestinationPath steamcmd -Force
 
-      - name: Run SteamCMD (FIXED - NO HANG)
+      - name: Run SteamCMD (FORCED NON-INTERACTIVE - FIXED)
+        shell: cmd
+        run: |
+          steamcmd\steamcmd.exe +login anonymous +download_depot 730 731 7043469183016184477 +download_depot 730 732 4047004309608881181 +quit
+
+      - name: Locate output
         shell: powershell
         run: |
-          $steamcmd = "$env:GITHUB_WORKSPACE\steamcmd\steamcmd.exe"
-
-          & $steamcmd -batchmode `
-            +login anonymous `
-            +download_depot 730 731 7043469183016184477 `
-            +download_depot 730 732 4047004309608881181 `
-            +quit
-
-      - name: Find SteamCMD output
-        shell: powershell
-        run: |
-          Write-Host "Searching for depot files..."
           Get-ChildItem -Recurse "$env:USERPROFILE\Steam" -ErrorAction SilentlyContinue
-          Get-ChildItem -Recurse "$env:PROGRAMFILES(x86)\Steam" -ErrorAction SilentlyContinue
 
-      - name: Copy depot files to output
+      - name: Copy output
         shell: powershell
         run: |
-          $paths = @(
-            "$env:USERPROFILE\Steam\steamapps\content\730",
-            "$env:PROGRAMFILES(x86)\Steam\steamapps\content\730"
-          )
-
-          foreach ($p in $paths) {
-            if (Test-Path $p) {
-              Write-Host "Found: $p"
-              Copy-Item "$p\*" "$env:GITHUB_WORKSPACE\output" -Recurse -Force
-            }
+          $src = "$env:USERPROFILE\Steam\steamapps\content\730"
+          if (Test-Path $src) {
+            Copy-Item "$src\*" output -Recurse -Force
           }
 
-      - name: Install 7-Zip
+      - name: Install 7zip
         shell: powershell
         run: choco install 7zip -y
 
-      - name: Create 7z archive
+      - name: Create archive
         shell: powershell
         run: |
-          & "C:\Program Files\7-Zip\7z.exe" a depot_build.7z "$env:GITHUB_WORKSPACE\output\*"
+          & "C:\Program Files\7-Zip\7z.exe" a depot_build.7z output\*
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: depot-build
-          path: depot_build.7z
+          path: depot_build.7zl
