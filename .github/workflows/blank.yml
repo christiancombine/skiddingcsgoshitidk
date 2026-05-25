@@ -1,0 +1,44 @@
+name: Steam Depot Downloader
+
+on:
+  workflow_dispatch:
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y steamcmd p7zip-full
+
+      - name: Download depots with SteamCMD
+        run: |
+          mkdir -p output
+
+          steamcmd +login anonymous \
+            +download_depot 730 731 7043469183016184477 \
+            +download_depot 730 732 4047004309608881181 \
+            +quit
+
+      - name: Collect downloaded files
+        run: |
+          mkdir -p output
+
+          # SteamCMD depot output location
+          cp -r ~/.steam/steam/steamapps/content/730/* output/ || true
+
+          # fallback path (some runners use this instead)
+          cp -r ~/.local/share/Steam/steamapps/content/730/* output/ || true
+
+      - name: Create 7z archive
+        run: |
+          7z a depot_build.7z output
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: depot-build
+          path: depot_build.7z
