@@ -1,4 +1,4 @@
-name: Steam Depot Downloader (Windows)
+name: Steam Depot Downloader (Stable Windows)
 
 on:
   workflow_dispatch:
@@ -16,23 +16,42 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force steamcmd
           New-Item -ItemType Directory -Force output
+          New-Item -ItemType Directory -Force $env:GITHUB_WORKSPACE\steam_config
 
       - name: Download SteamCMD
         shell: powershell
         run: |
-          Invoke-WebRequest -Uri "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip" -OutFile "steamcmd.zip"
+          Invoke-WebRequest `
+            -Uri "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip" `
+            -OutFile steamcmd.zip
+
           Expand-Archive steamcmd.zip -DestinationPath steamcmd -Force
 
-      - name: Run SteamCMD (FIXED NO HANG)
+      - name: Force SteamCMD config bootstrap (IMPORTANT FIX)
         shell: powershell
         run: |
-          $env:HOME = $env:GITHUB_WORKSPACE
+          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\steamcmd\config"
+
+      - name: Run SteamCMD (NO HANG FIXED)
+        shell: powershell
+        run: |
           $steamcmd = "$env:GITHUB_WORKSPACE\steamcmd\steamcmd.exe"
 
-          & $steamcmd `
+          $env:HOME = $env:GITHUB_WORKSPACE
+          $env:STEAMCMDDIR = "$env:GITHUB_WORKSPACE\steamcmd"
+
+          & $steamcmd -console `
+            +@ShutdownOnFailedCommand 1 `
             +@NoPromptForPassword 1 `
             +login anonymous `
             +force_install_dir "$env:GITHUB_WORKSPACE\output" `
+            +app_update 740 validate `
+            +quit
+
+          & $steamcmd -console `
+            +@ShutdownOnFailedCommand 1 `
+            +@NoPromptForPassword 1 `
+            +login anonymous `
             +download_depot 730 731 7043469183016184477 `
             +download_depot 730 732 4047004309608881181 `
             +quit
@@ -40,6 +59,7 @@ jobs:
       - name: Verify output
         shell: powershell
         run: |
+          Write-Host "=== OUTPUT FILES ==="
           Get-ChildItem -Recurse "$env:GITHUB_WORKSPACE\output"
 
       - name: Install 7zip
@@ -47,7 +67,7 @@ jobs:
         run: |
           choco install 7zip -y
 
-      - name: Create 7z archive
+      - name: Create archive
         shell: powershell
         run: |
           & "C:\Program Files\7-Zip\7z.exe" a depot_build.7z "$env:GITHUB_WORKSPACE\output\*"
