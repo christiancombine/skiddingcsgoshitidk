@@ -1,4 +1,4 @@
-name: Steam Depot Downloader (Clean Windows)
+name: Steam Depot Downloader (Windows Stable)
 
 on:
   workflow_dispatch:
@@ -26,40 +26,47 @@ jobs:
 
           Expand-Archive steamcmd.zip -DestinationPath steamcmd -Force
 
-      - name: Run SteamCMD (MINIMAL - FIXED)
+      - name: Run SteamCMD (FIXED - NO HANG)
         shell: powershell
         run: |
           $steamcmd = "$env:GITHUB_WORKSPACE\steamcmd\steamcmd.exe"
 
-          & $steamcmd `
+          & $steamcmd -batchmode `
             +login anonymous `
             +download_depot 730 731 7043469183016184477 `
             +download_depot 730 732 4047004309608881181 `
             +quit
 
-      - name: Locate downloaded files
+      - name: Find SteamCMD output
         shell: powershell
         run: |
-          Get-ChildItem -Recurse "$env:USERPROFILE\Steam\steamapps\content" -ErrorAction SilentlyContinue
-          Get-ChildItem -Recurse "$env:PROGRAMFILES(x86)\Steam\steamapps\content" -ErrorAction SilentlyContinue
+          Write-Host "Searching for depot files..."
+          Get-ChildItem -Recurse "$env:USERPROFILE\Steam" -ErrorAction SilentlyContinue
+          Get-ChildItem -Recurse "$env:PROGRAMFILES(x86)\Steam" -ErrorAction SilentlyContinue
 
-      - name: Copy output
+      - name: Copy depot files to output
         shell: powershell
         run: |
-          $src1 = "$env:USERPROFILE\Steam\steamapps\content\730"
-          $src2 = "$env:PROGRAMFILES(x86)\Steam\steamapps\content\730"
+          $paths = @(
+            "$env:USERPROFILE\Steam\steamapps\content\730",
+            "$env:PROGRAMFILES(x86)\Steam\steamapps\content\730"
+          )
 
-          if (Test-Path $src1) { Copy-Item $src1\* output -Recurse -Force }
-          if (Test-Path $src2) { Copy-Item $src2\* output -Recurse -Force }
+          foreach ($p in $paths) {
+            if (Test-Path $p) {
+              Write-Host "Found: $p"
+              Copy-Item "$p\*" "$env:GITHUB_WORKSPACE\output" -Recurse -Force
+            }
+          }
 
-      - name: Install 7zip
+      - name: Install 7-Zip
         shell: powershell
         run: choco install 7zip -y
 
-      - name: Create archive
+      - name: Create 7z archive
         shell: powershell
         run: |
-          & "C:\Program Files\7-Zip\7z.exe" a depot_build.7z output\*
+          & "C:\Program Files\7-Zip\7z.exe" a depot_build.7z "$env:GITHUB_WORKSPACE\output\*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
