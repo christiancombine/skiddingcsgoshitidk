@@ -1,51 +1,56 @@
-name: Steam Depot Downloader
+name: Steam Depot Downloader (Windows)
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/depot-download.yml
 
 jobs:
   download:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
-      - name: Install dependencies
+      - name: Setup folders
+        shell: powershell
         run: |
-          sudo apt-get update
-          sudo apt-get install -y curl tar p7zip-full lib32gcc-s1 lib32stdc++6
+          New-Item -ItemType Directory -Force steamcmd
+          New-Item -ItemType Directory -Force output
 
-      - name: Install SteamCMD manually (FIXED)
+      - name: Download SteamCMD
+        shell: powershell
         run: |
-          mkdir -p steamcmd
-          cd steamcmd
+          Invoke-WebRequest -Uri "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip" -OutFile "steamcmd.zip"
+          Expand-Archive steamcmd.zip -DestinationPath steamcmd -Force
 
-          curl -O https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
-          tar -xvzf steamcmd_linux.tar.gz
-
-      - name: Run SteamCMD downloads
+      - name: Run SteamCMD (FIXED NO HANG)
+        shell: powershell
         run: |
-          mkdir -p output
+          $env:HOME = $env:GITHUB_WORKSPACE
+          $steamcmd = "$env:GITHUB_WORKSPACE\steamcmd\steamcmd.exe"
 
-          ./steamcmd/steamcmd.sh +login anonymous \
-            +download_depot 730 731 7043469183016184477 \
-            +download_depot 730 732 4047004309608881181 \
+          & $steamcmd `
+            +@NoPromptForPassword 1 `
+            +login anonymous `
+            +force_install_dir "$env:GITHUB_WORKSPACE\output" `
+            +download_depot 730 731 7043469183016184477 `
+            +download_depot 730 732 4047004309608881181 `
             +quit
 
-      - name: Collect depot files
+      - name: Verify output
+        shell: powershell
         run: |
-          mkdir -p output
+          Get-ChildItem -Recurse "$env:GITHUB_WORKSPACE\output"
 
-          # SteamCMD default output path
-          if [ -d "$HOME/Steam/steamapps/content/730" ]; then
-            cp -r "$HOME/Steam/steamapps/content/730/"* output/
-          fi
-
-          if [ -d "$HOME/.steam/steam/steamapps/content/730" ]; then
-            cp -r "$HOME/.steam/steam/steamapps/content/730/"* output/
-          fi
-
-      - name: Create .7z archive
+      - name: Install 7zip
+        shell: powershell
         run: |
-          7z a depot_build.7z output
+          choco install 7zip -y
+
+      - name: Create 7z archive
+        shell: powershell
+        run: |
+          & "C:\Program Files\7-Zip\7z.exe" a depot_build.7z "$env:GITHUB_WORKSPACE\output\*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
